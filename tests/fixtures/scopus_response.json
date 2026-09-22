@@ -1,0 +1,22 @@
+{
+  "search-results": {
+    "entry": [
+      {
+        "dc:title": "Multi-agent scheduling with language models",
+        "dc:creator": "Ada Lovelace",
+        "prism:coverDate": "2024-05-01",
+        "prism:publicationName": "Example Journal",
+        "subtypeDescription": "Article",
+        "prism:doi": "10.1234/scopus-example"
+      },
+      {
+        "dc:title": "Mining dispatch conference study",
+        "dc:creator": "Alan Turing",
+        "prism:coverDate": "2023-11-15",
+        "prism:publicationName": "Example Proceedings",
+        "subtypeDescription": "Conference Paper",
+        "prism:doi": "10.1234/scopus-conference"
+      }
+    ]
+  }
+}

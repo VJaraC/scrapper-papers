@@ -1,0 +1,15 @@
+{
+  "data": [
+    {
+      "title": "Multi-agent scheduling with language models",
+      "abstract": "A controlled fixture abstract.",
+      "year": 2024,
+      "venue": "Example Journal",
+      "publicationVenue": {"name": "Example Journal", "type": "journal"},
+      "journal": {"name": "Example Journal"},
+      "authors": [{"name": "Ada Lovelace"}, {"name": "Alan Turing"}],
+      "externalIds": {"DOI": "10.1234/example"},
+      "publicationTypes": ["JournalArticle"]
+    }
+  ]
+}

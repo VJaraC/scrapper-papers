@@ -1,0 +1,27 @@
+# Entornos virtuales y dependencias
+.venv/
+venv/
+ENV/
+env/
+
+# Caches y compilados de Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Archivos de configuración de editores y SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Archivos temporales de Draw.io
+.~*
+*.drawio.bkp
+*.drawio.dtmp
+
+# Ignorar logs locales
+*.log

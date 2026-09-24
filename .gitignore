@@ -1,3 +1,6 @@
+# Variables de entorno con credenciales
+.env
+
 # Entornos virtuales y dependencias
 .venv/
 venv/

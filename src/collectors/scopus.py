@@ -3,6 +3,8 @@ import os
 
 import requests
 
+from src.collectors.errors import CollectorError
+
 
 LOGGER = logging.getLogger(__name__)
 SEARCH_URL = "https://api.elsevier.com/content/search/scopus"
@@ -20,7 +22,7 @@ def collect_papers(
         LOGGER.error("SCOPUS_API_KEY environment variable is missing")
         return []
 
-    scopus_query = f"TITLE-ABS-KEY({query})"
+    scopus_query = f"TITLE-ABS-KEY({_build_query(query)})"
     if year_from is not None and year_to is not None:
         scopus_query += (
             f" AND PUBYEAR > {year_from - 1}"
@@ -40,11 +42,16 @@ def collect_papers(
         response.raise_for_status()
     except requests.RequestException as error:
         LOGGER.error("Scopus request failed: %s", error)
-        return []
+        raise CollectorError(str(error)) from error
 
     response_data = response.json()
     entries = response_data.get("search-results", {}).get("entry", [])
     return [_normalize_paper(entry) for entry in entries]
+
+
+def _build_query(query: str) -> str:
+    terms = query.split()
+    return " AND ".join(terms)
 
 
 def _normalize_paper(paper: dict) -> dict:

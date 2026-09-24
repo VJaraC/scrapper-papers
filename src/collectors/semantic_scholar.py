@@ -3,6 +3,8 @@ import os
 
 import requests
 
+from src.collectors.errors import CollectorError
+
 
 LOGGER = logging.getLogger(__name__)
 SEARCH_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
@@ -39,7 +41,7 @@ def collect_papers(
         response.raise_for_status()
     except requests.RequestException as error:
         LOGGER.error("Semantic Scholar request failed: %s", error)
-        return []
+        raise CollectorError(str(error)) from error
 
     response_data = response.json()
     papers = response_data.get("data", [])

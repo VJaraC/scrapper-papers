@@ -2,6 +2,8 @@ import logging
 
 import requests
 
+from src.collectors.errors import CollectorError
+
 
 LOGGER = logging.getLogger(__name__)
 CROSSREF_WORKS_URL = "https://api.crossref.org/works"
@@ -14,7 +16,9 @@ def enrich_paper(doi: str) -> dict | None:
         response.raise_for_status()
     except requests.RequestException as error:
         LOGGER.error("CrossRef request failed: %s", error)
-        return None
+        if error.response is not None and error.response.status_code == 404:
+            return None
+        raise CollectorError(str(error)) from error
 
     response_data = response.json()
     paper = response_data.get("message")

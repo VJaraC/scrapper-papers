@@ -10,6 +10,7 @@ import pandas as pd
 import streamlit as st
 
 from src.cli import DEFAULT_CSV_PATH
+from src.pipeline import run_search
 from src.storage.csv_store import (
     CSV_COLUMNS,
     export_papers_to_excel,
@@ -41,6 +42,8 @@ def filter_papers(papers: list[dict], filters: dict) -> list[dict]:
             continue
         if not _matches_filter(paper, "venue_type", filters.get("venue_type")):
             continue
+        if not _matches_filter(paper, "decision", filters.get("decision")):
+            continue
         filtered.append(paper)
     return filtered
 
@@ -49,12 +52,63 @@ def _matches_filter(paper: dict, field: str, expected) -> bool:
     return expected is None or paper.get(field) == expected
 
 
+def build_result_messages(result: dict) -> list[tuple[str, str]]:
+    """Translate a search result into UI message levels and text."""
+    messages = []
+    source_labels = {
+        "semantic_scholar": "Semantic Scholar",
+        "scopus": "Scopus",
+        "wos": "Web of Science",
+    }
+    for source_name, source_result in result.get("sources", {}).items():
+        label = source_labels.get(source_name, source_name)
+        if source_result.get("success"):
+            messages.append(("success", f"{label}: {source_result.get('count', 0)} papers"))
+        else:
+            error = source_result.get("error") or "error desconocido"
+            messages.append(("error", f"{label}: falló — {error}"))
+
+    crossref = result.get("enrichment", {}).get("crossref", {})
+    attempted = crossref.get("attempted", 0)
+    failed = crossref.get("failed", 0)
+    succeeded = crossref.get("succeeded", 0)
+    if failed:
+        messages.append(("error", f"CrossRef: fallaron {failed} enriquecimientos"))
+    elif attempted and succeeded < attempted:
+        messages.append(("warning", f"CrossRef: {succeeded} de {attempted} enriquecimientos completados"))
+    elif succeeded:
+        messages.append(("success", f"CrossRef: {succeeded} enriquecimientos"))
+    return messages
+
+
+def _display_result_messages(result: dict) -> None:
+    for level, message in build_result_messages(result):
+        getattr(st, level)(message)
+
+
 def run_app(csv_path=DEFAULT_CSV_PATH):
-    """Render the existing paper pool without triggering new searches."""
+    """Render search controls and the existing paper pool."""
     st.set_page_config(page_title="Pool de papers", layout="wide")
     st.title("Pool de papers")
 
     pool_path = Path(csv_path)
+    st.header("Buscar papers")
+    query = st.text_input("Query")
+    search_columns = st.columns(3)
+    year_from = search_columns[0].number_input("Año desde", min_value=1900, max_value=2100, value=2021)
+    year_to = search_columns[1].number_input("Año hasta", min_value=1900, max_value=2100, value=2026)
+    limit = search_columns[2].number_input("Límite por fuente", min_value=1, value=20)
+    if st.button("Buscar"):
+        with st.spinner("Buscando papers..."):
+            result = run_search(
+                query,
+                year_from=int(year_from),
+                year_to=int(year_to),
+                limit=int(limit),
+                csv_path=pool_path,
+            )
+        _display_result_messages(result)
+
     papers = load_pool(pool_path)
     if not papers:
         st.info("No hay papers en el pool.")
@@ -87,7 +141,11 @@ def _build_filters(sidebar, frame: pd.DataFrame) -> dict:
     years = [int(year) for year in frame["year"] if pd.notna(year)]
     year_min = min(years) if years else 2021
     year_max = max(years) if years else 2026
-    selected_years = sidebar.slider("Año", year_min, year_max, (year_min, year_max))
+    slider_min = year_min - 1 if year_min == year_max else year_min
+    slider_max = year_max + 1 if year_min == year_max else year_max
+    selected_years = sidebar.slider(
+        "Año", slider_min, slider_max, (year_min, year_max)
+    )
     return {
         "year_min": selected_years[0],
         "year_max": selected_years[1],
@@ -96,6 +154,7 @@ def _build_filters(sidebar, frame: pd.DataFrame) -> dict:
         "mineria": _select_boolean(sidebar, "Minería"),
         "categoria": _select_filter(sidebar, "Categoría", frame["categoria"]),
         "venue_type": _select_filter(sidebar, "Tipo de venue", frame["venue_type"]),
+        "decision": _select_filter(sidebar, "Decisión", frame["decision"]),
     }
 
 

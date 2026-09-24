@@ -17,12 +17,16 @@ EXPECTED_FALSE_AXES = {
 @pytest.mark.parametrize(
     "keyword",
     [
-        "multi-agent system",
-        "multiagent system",
-        "multi agent system",
-        "agent-based system",
+        "multi-agent",
+        "multiagent",
+        "multi agent",
+        "agent-based",
         "sistema multiagente",
         "sistemas multi-agente",
+        "multiagente",
+        "Multi-Agent Rescheduling Framework",
+        "Multi-Agent Reinforcement Learning",
+        "Priority-Driven Hierarchical Multi-Agent Systems",
     ],
 )
 def test_classify_paper_detects_each_mas_keyword(keyword):

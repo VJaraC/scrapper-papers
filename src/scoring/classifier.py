@@ -21,12 +21,13 @@ MINING_KEYWORDS = (
     "despacho minero",
 )
 MAS_KEYWORDS = (
-    "multi-agent system",
-    "multiagent system",
-    "multi agent system",
-    "agent-based system",
+    "multi-agent",
+    "multiagent",
+    "multi agent",
+    "agent-based",
     "sistema multiagente",
     "sistemas multi-agente",
+    "multiagente",
 )
 SCHEDULING_KEYWORDS = (
     "scheduling",

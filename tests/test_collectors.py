@@ -6,6 +6,7 @@ import pytest
 import requests
 
 from src.collectors.crossref import CROSSREF_WORKS_URL, enrich_paper
+from src.collectors.errors import CollectorError
 from src.collectors.scopus import SEARCH_URL as SCOPUS_SEARCH_URL
 from src.collectors.scopus import collect_papers as scopus_collect_papers
 from src.collectors.semantic_scholar import SEARCH_URL, collect_papers
@@ -35,13 +36,14 @@ def test_collect_papers_normalizes_complete_response_and_request_options():
     response = make_response(load_fixture())
     response.raise_for_status.return_value = None
 
-    with patch("src.collectors.semantic_scholar.requests.get", return_value=response) as get:
-        papers = collect_papers(
-            "multi-agent scheduling",
-            year_from=2021,
-            year_to=2026,
-            limit=10,
-        )
+    with patch.dict("os.environ", {}, clear=True):
+        with patch("src.collectors.semantic_scholar.requests.get", return_value=response) as get:
+            papers = collect_papers(
+                "multi-agent scheduling",
+                year_from=2021,
+                year_to=2026,
+                limit=10,
+            )
 
     assert papers == [
         {
@@ -139,7 +141,7 @@ def test_collect_papers_returns_empty_list_for_empty_response():
     assert papers == [], "An empty API result should produce an empty paper list."
 
 
-def test_collect_papers_returns_empty_list_and_logs_request_error(caplog):
+def test_collect_papers_raises_collector_error_and_logs_request_error(caplog):
     request_error = requests.HTTPError("controlled HTTP failure")
 
     with patch(
@@ -147,9 +149,9 @@ def test_collect_papers_returns_empty_list_and_logs_request_error(caplog):
         side_effect=request_error,
     ):
         with caplog.at_level("ERROR"):
-            papers = collect_papers("scheduling")
+            with pytest.raises(CollectorError, match="controlled HTTP failure"):
+                collect_papers("scheduling")
 
-    assert papers == [], "HTTP errors should not propagate to the caller."
     assert "Semantic Scholar request failed" in caplog.text
     assert "controlled HTTP failure" in caplog.text
 
@@ -205,31 +207,44 @@ def test_crossref_enrich_paper_returns_none_for_empty_response():
     assert enrichment is None, "A response without a CrossRef paper should return None."
 
 
-def test_crossref_enrich_paper_returns_none_and_logs_request_error(caplog):
+def test_crossref_enrich_paper_raises_collector_error_for_request_error(caplog):
     request_error = requests.HTTPError("controlled CrossRef failure")
 
     with patch("src.collectors.crossref.requests.get", side_effect=request_error):
         with caplog.at_level("ERROR"):
-            enrichment = enrich_paper("10.1234/failing")
+            with pytest.raises(CollectorError, match="controlled CrossRef failure"):
+                enrich_paper("10.1234/failing")
 
-    assert enrichment is None, "HTTP errors should not propagate to the caller."
     assert "CrossRef request failed" in caplog.text
     assert "controlled CrossRef failure" in caplog.text
 
 
-@pytest.mark.parametrize("status_code", [404, 500])
-def test_crossref_enrich_paper_handles_http_status_errors(status_code, caplog):
+def test_crossref_enrich_paper_returns_none_for_http_404(caplog):
     response = make_response({})
-    response.raise_for_status.side_effect = requests.HTTPError(
-        f"controlled HTTP {status_code} failure"
-    )
+    response.raise_for_status.side_effect = requests.HTTPError("controlled HTTP 404 failure")
+    response.raise_for_status.side_effect.response = response
+    response.status_code = 404
 
     with patch("src.collectors.crossref.requests.get", return_value=response):
         with caplog.at_level("ERROR"):
-            enrichment = enrich_paper(f"10.1234/http-{status_code}")
+            enrichment = enrich_paper("10.1234/http-404")
 
-    assert enrichment is None, "HTTP status errors should return None."
-    assert f"controlled HTTP {status_code} failure" in caplog.text
+    assert enrichment is None, "A missing DOI should not count as a CrossRef failure."
+    assert "controlled HTTP 404 failure" in caplog.text
+
+
+def test_crossref_enrich_paper_raises_for_non_404_http_status(caplog):
+    response = make_response({})
+    response.raise_for_status.side_effect = requests.HTTPError("controlled HTTP 500 failure")
+    response.raise_for_status.side_effect.response = response
+    response.status_code = 500
+
+    with patch("src.collectors.crossref.requests.get", return_value=response):
+        with caplog.at_level("ERROR"):
+            with pytest.raises(CollectorError, match="controlled HTTP 500 failure"):
+                enrich_paper("10.1234/http-500")
+
+    assert "CrossRef request failed" in caplog.text
 
 
 def test_crossref_enrich_paper_maps_only_real_crossref_venue_types():
@@ -321,7 +336,7 @@ def test_scopus_collect_papers_normalizes_standard_response_and_request_options(
         SCOPUS_SEARCH_URL,
         params={
             "query": (
-                "TITLE-ABS-KEY(multi-agent scheduling) AND PUBYEAR > 2020 "
+                "TITLE-ABS-KEY(multi-agent AND scheduling) AND PUBYEAR > 2020 "
                 "AND PUBYEAR < 2027"
             ),
             "count": 10,
@@ -342,6 +357,19 @@ def test_scopus_collect_papers_omits_year_filter_when_year_range_is_incomplete()
 
     assert papers == [], "An incomplete year range should not add a partial filter."
     assert get.call_args.kwargs["params"]["query"] == "TITLE-ABS-KEY(scheduling)"
+
+
+def test_scopus_collect_papers_joins_query_terms_with_explicit_and():
+    response = make_response({"search-results": {"entry": []}})
+    response.raise_for_status.return_value = None
+
+    with patch.dict("os.environ", {"SCOPUS_API_KEY": "test-scopus-key"}):
+        with patch("src.collectors.scopus.requests.get", return_value=response) as get:
+            scopus_collect_papers("multi-agent system mining dispatch scheduling")
+
+    assert get.call_args.kwargs["params"]["query"] == (
+        "TITLE-ABS-KEY(multi-agent AND system AND mining AND dispatch AND scheduling)"
+    ), "Each query term should be ANDed explicitly, matching the WoS collector's pattern."
 
 
 def test_scopus_collect_papers_handles_missing_standard_fields():
@@ -394,7 +422,7 @@ def test_scopus_collect_papers_returns_empty_list_for_empty_response():
     assert papers == [], "An empty Scopus result should produce an empty paper list."
 
 
-def test_scopus_collect_papers_returns_empty_list_and_logs_request_error(caplog):
+def test_scopus_collect_papers_raises_collector_error_and_logs_request_error(caplog):
     request_error = requests.HTTPError("controlled Scopus failure")
 
     with patch.dict("os.environ", {"SCOPUS_API_KEY": "test-scopus-key"}):
@@ -403,8 +431,8 @@ def test_scopus_collect_papers_returns_empty_list_and_logs_request_error(caplog)
             side_effect=request_error,
         ):
             with caplog.at_level("ERROR"):
-                papers = scopus_collect_papers("scheduling")
+                with pytest.raises(CollectorError, match="controlled Scopus failure"):
+                    scopus_collect_papers("scheduling")
 
-    assert papers == [], "HTTP errors should not propagate to the caller."
     assert "Scopus request failed" in caplog.text
     assert "controlled Scopus failure" in caplog.text

@@ -145,3 +145,7 @@ scrapper-papers/
 
 - Solo Semantic Scholar trae abstract; Scopus y WoS solo aportan metadata (título, autores, año, venue, DOI). El campo `abstract` queda vacío para papers que solo vengan de esas dos fuentes.
 - La deduplicación entre fuentes es **por DOI**. Un paper que no tenga DOI (o que las distintas fuentes reporten con DOIs inconsistentes) puede aparecer duplicado en el pool.
+
+## Agradecimientos
+
+Este repositorio se generó a partir de la plantilla [eda-plantilla-evaluacion-asimetrica](https://github.com/moyarzunsil/eda-plantilla-evaluacion-asimetrica) de [@moyarzunsil](https://github.com/moyarzunsil).

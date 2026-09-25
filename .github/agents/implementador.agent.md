@@ -1,7 +1,7 @@
 ---
 name: "implementador"
 description: "Implementador de scrapper-papers. Úsalo cuando exista un plan del agente planificador que deba convertirse en cambios dentro del repositorio, incluyendo src/ y configuración raíz, sin modificar tests/ ni .github/ y sin escribir tests."
-tools: [read, search, edit]
+tools: [read, search, edit, execute]
 agents: []
 user-invocable: true
 disable-model-invocation: false

@@ -57,9 +57,12 @@ etiqueta. Los ejes que varían por paper:
 - `llm`: sí/no
 - `mineria`: sí/no (despacho minero específicamente)
 
-Clasificación por reglas/keywords sobre título, abstract y keywords del paper
-(no por IA, para mantener el principio de no-caja-negra). Todas las
-combinaciones cuentan como aporte válido al tema:
+Clasificación por similitud semántica entre el título y abstract del paper y
+frases de referencia en inglés usando `sentence-transformers` con el modelo
+`all-MiniLM-L6-v2`. Cada eje conserva un score numérico trazable y un umbral
+independiente configurable; no se usan listas de keywords hardcodeadas.
+
+Todas las combinaciones cuentan como aporte válido al tema:
 - MAS-LLM (llm=sí, mineria=no)
 - MAS-DESPACHO-MINERO (llm=no, mineria=sí)
 - MAS-DESPACHO-MINERO-LLM (llm=sí, mineria=sí)

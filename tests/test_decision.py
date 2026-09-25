@@ -82,6 +82,75 @@ def test_decide_paper_exact_age_limit_is_not_excluded():
 
 
 @pytest.mark.parametrize(
+    "category",
+    ["MAS-DESPACHO-MINERO", "MAS-DESPACHO-MINERO-LLM"],
+)
+def test_decide_paper_expanded_categories_ignore_preprint_and_conference_rules(
+    category,
+):
+    result = decide(
+        make_paper(
+            categoria=category,
+            is_preprint=True,
+            venue_type="conference",
+        )
+    )
+
+    assert result["decision"] == "incluido"
+    assert "se omitio exclusion por is_preprint=True" in result["justification"]
+    assert "se omitio pendiente por venue_type=conference" in result["justification"]
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"categoria": "MAS-DESPACHO-MINERO", "is_preprint": True, "year": YEAR_LIMIT - 1},
+        {"categoria": "MAS-DESPACHO-MINERO-LLM", "venue_type": "conference", "year": YEAR_LIMIT - 1},
+    ],
+)
+def test_decide_paper_expanded_categories_still_apply_other_exclusion_rules(overrides):
+    result = decide(make_paper(**overrides))
+
+    assert result["decision"] == "excluido"
+    assert f"year={YEAR_LIMIT - 1} < {YEAR_LIMIT}" in result["justification"]
+
+
+@pytest.mark.parametrize(
+    "category",
+    ["MAS-DESPACHO-MINERO", "MAS-DESPACHO-MINERO-LLM"],
+)
+def test_decide_paper_expanded_categories_ignore_mas_false_rule(category):
+    result = decide(make_paper(categoria=category, mas=False))
+
+    assert result["decision"] == "incluido"
+    assert (
+        "se omitio exclusion por mas=False por categoria de alcance ampliado"
+        in result["justification"]
+    )
+
+
+def test_decide_paper_keeps_strict_mas_false_rule_for_mas_llm():
+    result = decide(make_paper(categoria="MAS-LLM", mas=False))
+
+    assert result["decision"] == "excluido"
+    assert "mas=False" in result["justification"]
+
+
+def test_decide_paper_keeps_strict_preprint_and_conference_rules_for_mas_llm():
+    preprint_result = decide(
+        make_paper(categoria="MAS-LLM", is_preprint=True)
+    )
+    conference_result = decide(
+        make_paper(categoria="MAS-LLM", venue_type="conference")
+    )
+
+    assert preprint_result["decision"] == "excluido"
+    assert "is_preprint=True" in preprint_result["justification"]
+    assert conference_result["decision"] == "pendiente"
+    assert "venue_type=conference" in conference_result["justification"]
+
+
+@pytest.mark.parametrize(
     "overrides, expected_reason",
     [
         ({"venue_type": "conference"}, "venue_type=conference"),

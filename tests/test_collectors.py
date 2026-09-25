@@ -75,11 +75,67 @@ def test_collect_papers_normalizes_complete_response_and_request_options():
                 "title,abstract,year,venue,publicationVenue,journal,authors,"
                 "externalIds,publicationTypes"
             ),
-            "publicationTypes": "JournalArticle",
             "year": "2021-2026",
         },
         headers={},
     )
+
+
+@pytest.mark.parametrize("publication_type", ["Conference", "ConferencePaper"])
+def test_collect_papers_does_not_mark_recognized_conference_types_as_preprints(
+    publication_type,
+):
+    response = make_response(
+        {
+            "data": [
+                {
+                    "title": "Conference paper",
+                    "publicationTypes": [publication_type],
+                    "externalIds": {"ArXiv": "2401.12345"},
+                }
+            ]
+        }
+    )
+    response.raise_for_status.return_value = None
+
+    with patch("src.collectors.semantic_scholar.requests.get", return_value=response):
+        papers = collect_papers("scheduling")
+
+    assert papers[0]["is_preprint"] is False, (
+        "Recognized conference types must not be classified as preprints."
+    )
+    assert papers[0]["venue_type"] == "conference"
+
+
+@pytest.mark.parametrize(
+    ("publication_types", "external_ids", "expected"),
+    [
+        ([], {"ArXiv": "2401.12345"}, True),
+        (["UnknownType"], {"ArXiv": "2401.12345"}, True),
+        (["Review"], {"ArXiv": "2401.12345"}, False),
+        (["UnknownType"], {}, False),
+    ],
+)
+def test_collect_papers_uses_arxiv_and_publication_types_for_preprint_heuristic(
+    publication_types, external_ids, expected
+):
+    response = make_response(
+        {
+            "data": [
+                {
+                    "title": "Heuristic preprint case",
+                    "publicationTypes": publication_types,
+                    "externalIds": external_ids,
+                }
+            ]
+        }
+    )
+    response.raise_for_status.return_value = None
+
+    with patch("src.collectors.semantic_scholar.requests.get", return_value=response):
+        papers = collect_papers("scheduling")
+
+    assert papers[0]["is_preprint"] is expected
 
 
 def test_collect_papers_omits_api_key_header_when_key_is_absent():

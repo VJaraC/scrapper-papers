@@ -112,8 +112,9 @@ def test_run_search_continues_after_one_source_fails(tmp_path):
                 "src.pipeline.wos.collect_papers",
                 side_effect=CollectorError("wos unavailable"),
             ):
-                with patch("src.pipeline.upsert_papers", return_value=counts):
-                    result = run_search("scheduling", csv_path=tmp_path / "papers.csv")
+                with patch("src.pipeline.classify_paper", return_value=CLASSIFICATION):
+                    with patch("src.pipeline.upsert_papers", return_value=counts):
+                        result = run_search("scheduling", csv_path=tmp_path / "papers.csv")
 
     assert result["sources"]["semantic_scholar"] == {
         "success": False,
@@ -139,10 +140,11 @@ def test_run_search_collects_wos_results(tmp_path):
     with patch("src.pipeline.semantic_scholar.collect_papers", return_value=[]):
         with patch("src.pipeline.scopus.collect_papers", return_value=[]):
             with patch("src.pipeline.wos.collect_papers", return_value=[wos_paper]) as wos_collect:
-                with patch("src.pipeline.upsert_papers", return_value=counts) as upsert:
-                    result = run_search(
-                        "scheduling", 2022, 2025, 7, tmp_path / "papers.csv"
-                    )
+                with patch("src.pipeline.classify_paper", return_value=CLASSIFICATION):
+                    with patch("src.pipeline.upsert_papers", return_value=counts) as upsert:
+                        result = run_search(
+                            "scheduling", 2022, 2025, 7, tmp_path / "papers.csv"
+                        )
 
     wos_collect.assert_called_once_with(
         "scheduling", year_from=2022, year_to=2025, limit=7
@@ -163,8 +165,9 @@ def test_run_search_counts_crossref_404_as_attempt_without_failure(tmp_path):
         with patch("src.pipeline.scopus.collect_papers", return_value=[]):
             with patch("src.pipeline.wos.collect_papers", return_value=[]):
                 with patch("src.pipeline.crossref.enrich_paper", return_value=None):
-                    with patch("src.pipeline.upsert_papers", return_value=counts):
-                        result = run_search("scheduling", csv_path=tmp_path / "papers.csv")
+                    with patch("src.pipeline.classify_paper", return_value=CLASSIFICATION):
+                        with patch("src.pipeline.upsert_papers", return_value=counts):
+                            result = run_search("scheduling", csv_path=tmp_path / "papers.csv")
 
     assert result["enrichment"]["crossref"] == {
         "attempted": 1,
@@ -184,8 +187,9 @@ def test_run_search_counts_crossref_collector_error_as_failure(tmp_path):
                     "src.pipeline.crossref.enrich_paper",
                     side_effect=CollectorError("crossref unavailable"),
                 ):
-                    with patch("src.pipeline.upsert_papers", return_value=counts):
-                        result = run_search("scheduling", csv_path=tmp_path / "papers.csv")
+                    with patch("src.pipeline.classify_paper", return_value=CLASSIFICATION):
+                        with patch("src.pipeline.upsert_papers", return_value=counts):
+                            result = run_search("scheduling", csv_path=tmp_path / "papers.csv")
 
     assert result["enrichment"]["crossref"] == {
         "attempted": 1,

@@ -25,7 +25,6 @@ def collect_papers(
         "query": query,
         "limit": limit,
         "fields": PAPER_FIELDS,
-        "publicationTypes": "JournalArticle",
     }
 
     if year_from is not None and year_to is not None:
@@ -54,6 +53,13 @@ def _normalize_paper(paper: dict) -> dict:
     venue_type = _get_venue_type(publication_types)
     external_ids = paper.get("externalIds") or {}
     authors = paper.get("authors") or []
+    # This is an approximate heuristic, not a perfect preprint detector.
+    is_preprint = (
+        bool(external_ids.get("ArXiv"))
+        and not set(publication_types).intersection(
+            {"JournalArticle", "Conference", "ConferencePaper", "Review"}
+        )
+    )
 
     return {
         "title": paper.get("title"),
@@ -64,7 +70,7 @@ def _normalize_paper(paper: dict) -> dict:
         "doi": external_ids.get("DOI"),
         "abstract": paper.get("abstract"),
         "source": "semantic_scholar",
-        "is_preprint": False,
+        "is_preprint": is_preprint,
         "llm": None,
         "revisado": False,
         "mineria": None,
